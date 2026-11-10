@@ -7,6 +7,7 @@ import 'package:habitly/logic/habit_stats.dart';
 import 'package:habitly/providers/providers.dart';
 import 'package:habitly/screens/habit_form_screen.dart';
 import 'package:habitly/screens/settings_screen.dart';
+import 'package:habitly/widgets/day_note_sheet.dart';
 import 'package:habitly/widgets/empty_state.dart';
 import 'package:habitly/widgets/upgrade_dialog.dart';
 
@@ -257,6 +258,9 @@ class _HabitCard extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final remindersOn = ref.watch(remindersEnabledProvider);
+    final note = snapshot.noteFor(habit.id, today);
+    void openNote() =>
+        showDayNoteSheet(context, habit: habit, day: today, existing: note);
 
     final String status;
     if (!scheduledToday) {
@@ -271,6 +275,7 @@ class _HabitCard extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 10),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
+        onLongPress: openNote,
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
@@ -333,8 +338,23 @@ class _HabitCard extends ConsumerWidget {
                             ),
                         ],
                       ),
+                      if (note != null) ...[
+                        const SizedBox(height: 4),
+                        NotePreview(note: note),
+                      ],
                     ],
                   ),
+                ),
+              ),
+              IconButton(
+                key: ValueKey('habit-note-${habit.id}'),
+                tooltip: note != null
+                    ? 'Editar nota do dia'
+                    : 'Por que não consegui?',
+                onPressed: openNote,
+                icon: Icon(
+                  note != null ? Icons.sticky_note_2 : Icons.edit_note_outlined,
+                  color: note != null ? scheme.tertiary : scheme.outline,
                 ),
               ),
               if (scheduledToday)
@@ -356,7 +376,7 @@ class _HabitCard extends ConsumerWidget {
                 )
               else
                 Padding(
-                  padding: const EdgeInsets.only(right: 16),
+                  padding: const EdgeInsets.only(right: 16, left: 4),
                   child: Icon(Icons.event_busy_outlined, color: scheme.outline),
                 ),
             ],

@@ -4,6 +4,7 @@ import 'package:habitly/data/habit_repository.dart';
 import 'package:habitly/logic/dates.dart';
 import 'package:habitly/logic/habit_stats.dart';
 import 'package:habitly/providers/providers.dart';
+import 'package:habitly/widgets/day_note_sheet.dart';
 import 'package:habitly/widgets/empty_state.dart';
 import 'package:table_calendar/table_calendar.dart';
 
@@ -43,7 +44,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final scheme = Theme.of(context).colorScheme;
     final today = dateOnly(DateTime.now());
     final presence = snapshot.toPresence();
-    final dueToday = snapshot.habitsScheduledOn(_selected);
+    // Agendados no dia + qualquer hábito que tenha nota nesse dia.
+    final dueToday = snapshot.habits
+        .where(
+          (h) =>
+              snapshot.habitsScheduledOn(_selected).any((d) => d.id == h.id) ||
+              snapshot.noteFor(h.id, _selected) != null,
+        )
+        .toList();
     return ListView(
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
       children: [
@@ -137,7 +145,28 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         else
           ...dueToday.map((habit) {
             final done = snapshot.isCompleted(habit.id, _selected);
+            final note = snapshot.noteFor(habit.id, _selected);
+            final canNote = !_selected.isAfter(today);
             return ListTile(
+              key: ValueKey('history-habit-${habit.id}'),
+              onTap: canNote
+                  ? () => showDayNoteSheet(
+                      context,
+                      habit: habit,
+                      day: _selected,
+                      existing: note,
+                    )
+                  : null,
+              subtitle: note != null
+                  ? NotePreview(note: note, maxLines: 3)
+                  : canNote && !done
+                  ? Text(
+                      'Toque para anotar por que não deu',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: scheme.outline),
+                    )
+                  : null,
               leading: CircleAvatar(
                 backgroundColor: Color(
                   habit.colorValue,
@@ -207,12 +236,32 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               : null,
         ),
         alignment: Alignment.center,
-        child: Text(
-          '${day.day}',
-          style: TextStyle(
-            color: text,
-            fontWeight: selected || isToday ? FontWeight.w700 : FontWeight.w500,
-          ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Text(
+              '${day.day}',
+              style: TextStyle(
+                color: text,
+                fontWeight: selected || isToday
+                    ? FontWeight.w700
+                    : FontWeight.w500,
+              ),
+            ),
+            if (snapshot.hasNotesOn(day))
+              Positioned(
+                bottom: -9,
+                child: Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: selected ? scheme.onPrimary : scheme.tertiary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

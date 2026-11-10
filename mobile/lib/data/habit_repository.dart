@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:habitly/data/app_database.dart';
 import 'package:habitly/logic/dates.dart';
 import 'package:habitly/logic/habit_stats.dart';
+import 'package:habitly/logic/note_reasons.dart';
 
 Set<int> parseWeekdays(String raw) {
   if (raw.trim().isEmpty) return {};
@@ -19,10 +20,32 @@ String encodeWeekdays(Set<int> days) {
 }
 
 class HabitSnapshot {
-  const HabitSnapshot({required this.habits, required this.completions});
+  const HabitSnapshot({
+    required this.habits,
+    required this.completions,
+    this.notes = const [],
+  });
 
   final List<Habit> habits;
   final List<Completion> completions;
+  final List<HabitDayNote> notes;
+
+  HabitDayNote? noteFor(int habitId, DateTime day) {
+    final key = dateKey(day);
+    for (final n in notes) {
+      if (n.habitId == habitId && n.day == key) return n;
+    }
+    return null;
+  }
+
+  bool hasNotesOn(DateTime day) {
+    final key = dateKey(day);
+    return notes.any((n) => n.day == key);
+  }
+
+  List<NoteEntry> noteEntries() => [
+    for (final n in notes) NoteEntry(habitId: n.habitId, reasonCode: n.reason),
+  ];
 
   Set<DateTime> completedDaysFor(int habitId) => dateKeysToDates(
     completions.where((c) => c.habitId == habitId).map((c) => c.day),
@@ -55,7 +78,11 @@ class HabitRepository {
     yield await loadSnapshot();
     yield* _db
         .tableUpdates(
-          TableUpdateQuery.onAllTables([_db.habits, _db.completions]),
+          TableUpdateQuery.onAllTables([
+            _db.habits,
+            _db.completions,
+            _db.habitDayNotes,
+          ]),
         )
         .asyncMap((_) => loadSnapshot());
   }
@@ -64,6 +91,7 @@ class HabitRepository {
     return HabitSnapshot(
       habits: await _db.getHabits(),
       completions: await _db.allCompletions(),
+      notes: await _db.allNotes(),
     );
   }
 
@@ -120,4 +148,33 @@ class HabitRepository {
       completed: completed,
     );
   }
+
+  Future<HabitDayNote?> noteFor({
+    required int habitId,
+    required DateTime day,
+  }) => _db.noteFor(habitId, dateKey(day));
+
+  /// Salva a nota do dia. Texto e motivo vazios ao mesmo tempo apagam a nota.
+  Future<void> saveNote({
+    required int habitId,
+    required DateTime day,
+    required String note,
+    NoteReason? reason,
+  }) async {
+    var text = note.trim();
+    if (text.length > maxNoteLength) text = text.substring(0, maxNoteLength);
+    if (text.isEmpty && reason == null) {
+      await deleteNote(habitId: habitId, day: day);
+      return;
+    }
+    await _db.upsertNote(
+      habitId: habitId,
+      day: dateKey(day),
+      note: text,
+      reason: reason?.code,
+    );
+  }
+
+  Future<void> deleteNote({required int habitId, required DateTime day}) =>
+      _db.deleteNote(habitId, dateKey(day));
 }

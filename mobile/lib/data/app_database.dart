@@ -37,7 +37,36 @@ class Completions extends Table {
   ];
 }
 
-@DriftDatabase(tables: [Habits, Completions])
+/// Nota do dia por hábito (v3, app 1.0.0+6): principalmente o motivo de
+/// não ter cumprido o hábito naquele dia.
+class HabitDayNotes extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  // FK explícita: com drift_dev 2.31 + analyzer 10 o `.references()` não é
+  // emitido no SQL gerado, então a cascata é declarada à mão.
+  IntColumn get habitId => integer().customConstraint(
+    'NOT NULL REFERENCES habits(id) ON DELETE CASCADE',
+  )();
+
+  /// Dia local no formato YYYY-MM-DD.
+  TextColumn get day => text()();
+
+  /// Texto livre (até 280 caracteres; pode ser vazio se houver motivo).
+  TextColumn get note =>
+      text().withLength(max: 280).withDefault(const Constant(''))();
+
+  /// Código de [NoteReason] (ex.: 'sem_tempo'). Nulo = sem motivo rápido.
+  TextColumn get reason => text().nullable()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+    {habitId, day},
+  ];
+}
+
+@DriftDatabase(tables: [Habits, Completions, HabitDayNotes])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor])
     : super(executor ?? driftDatabase(name: 'habitly'));
@@ -45,7 +74,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.memory() : super(NativeDatabase.memory());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -62,6 +91,11 @@ class AppDatabase extends _$AppDatabase {
           "UPDATE habits SET reminder = NULL "
           "WHERE reminder IS NOT NULL AND reminder NOT GLOB '[0-2][0-9]:[0-5][0-9]'",
         );
+      }
+      if (from < 3) {
+        // v3 (app 1.0.0+6): notas do dia por hábito. Só cria a tabela nova;
+        // hábitos e conclusões existentes não são tocados.
+        await m.createTable(habitDayNotes);
       }
     },
     beforeOpen: (details) async {
@@ -88,10 +122,13 @@ class AppDatabase extends _$AppDatabase {
   Future<void> updateHabitRow(int id, HabitsCompanion companion) =>
       (update(habits)..where((t) => t.id.equals(id))).write(companion);
 
-  Future<void> deleteHabitById(int id) async {
+  Future<void> deleteHabitById(int id) => transaction(() async {
+    // As FKs já têm ON DELETE CASCADE; a limpeza explícita garante o mesmo
+    // resultado mesmo se foreign_keys estiver desligado.
+    await (delete(habitDayNotes)..where((t) => t.habitId.equals(id))).go();
     await (delete(completions)..where((t) => t.habitId.equals(id))).go();
     await (delete(habits)..where((t) => t.id.equals(id))).go();
-  }
+  });
 
   Stream<List<Completion>> watchCompletions() => select(completions).watch();
 
@@ -123,4 +160,48 @@ class AppDatabase extends _$AppDatabase {
       )..where((t) => t.habitId.equals(habitId) & t.day.equals(day))).go();
     }
   }
+
+  Future<List<HabitDayNote>> allNotes() =>
+      (select(habitDayNotes)..orderBy([
+            (t) => OrderingTerm.desc(t.day),
+            (t) => OrderingTerm.asc(t.habitId),
+          ]))
+          .get();
+
+  Future<HabitDayNote?> noteFor(int habitId, String day) =>
+      (select(habitDayNotes)
+            ..where((t) => t.habitId.equals(habitId) & t.day.equals(day)))
+          .getSingleOrNull();
+
+  /// Cria ou atualiza a nota única de (hábito, dia), preservando createdAt.
+  Future<void> upsertNote({
+    required int habitId,
+    required String day,
+    required String note,
+    String? reason,
+  }) async {
+    final now = DateTime.now();
+    await into(habitDayNotes).insert(
+      HabitDayNotesCompanion.insert(
+        habitId: habitId,
+        day: day,
+        note: Value(note),
+        reason: Value(reason),
+        createdAt: Value(now),
+        updatedAt: Value(now),
+      ),
+      onConflict: DoUpdate(
+        (_) => HabitDayNotesCompanion(
+          note: Value(note),
+          reason: Value(reason),
+          updatedAt: Value(now),
+        ),
+        target: [habitDayNotes.habitId, habitDayNotes.day],
+      ),
+    );
+  }
+
+  Future<int> deleteNote(int habitId, String day) => (delete(
+    habitDayNotes,
+  )..where((t) => t.habitId.equals(habitId) & t.day.equals(day))).go();
 }
