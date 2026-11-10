@@ -23,6 +23,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- TODO: trocar pelo APPLICATION_ID real do AdMob do Habitly antes de anúncios em produção. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713"/>
     </application>
     <uses-permission android:name="android.permission.INTERNET"/>
 </manifest>
