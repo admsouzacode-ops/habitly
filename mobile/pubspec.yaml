@@ -1,5 +1,6 @@
 name: habitly
 description: Habitly - Daily Habit Tracker
+# Android applicationId / namespace: br.com.souzacode.habitly
 publish_to: 'none'
 version: 1.0.0+1
 
