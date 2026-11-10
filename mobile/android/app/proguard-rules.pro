@@ -29,3 +29,10 @@
 # flutter_local_notifications
 -keep class com.dexterous.** { *; }
 -dontwarn com.dexterous.**
+
+
+# Drift / sqlite3 (JNI do sqlite3_flutter_libs)
+-keep class org.sqlite.** { *; }
+-keep class org.sqlite.database.** { *; }
+-dontwarn org.sqlite.**
+-keep class io.flutter.plugins.** { *; }
