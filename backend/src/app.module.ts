@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { HabitsModule } from './habits/habits.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { User } from './entities/user.entity';
 import { Habit } from './entities/habit.entity';
 import { HabitLog } from './entities/habit-log.entity';
@@ -23,6 +24,7 @@ import { Subscription } from './entities/subscription.entity';
     }),
     AuthModule,
     HabitsModule,
+    SubscriptionsModule,
   ],
 })
 export class AppModule {}
