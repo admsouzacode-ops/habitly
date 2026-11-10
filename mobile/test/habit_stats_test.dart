@@ -11,22 +11,14 @@ void main() {
   group('currentStreak', () {
     test('zero quando não há dias concluídos', () {
       expect(
-        currentStreak(
-          weekdays: everyday(),
-          completedDays: {},
-          today: today,
-        ),
+        currentStreak(weekdays: everyday(), completedDays: {}, today: today),
         0,
       );
     });
 
     test('zero quando não há dias agendados', () {
       expect(
-        currentStreak(
-          weekdays: {},
-          completedDays: {today},
-          today: today,
-        ),
+        currentStreak(weekdays: {}, completedDays: {today}, today: today),
         0,
       );
     });
@@ -81,11 +73,7 @@ void main() {
   group('recordStreak', () {
     test('zero sem conclusões', () {
       expect(
-        recordStreak(
-          weekdays: everyday(),
-          completedDays: {},
-          today: today,
-        ),
+        recordStreak(weekdays: everyday(), completedDays: {}, today: today),
         0,
       );
     });
@@ -166,7 +154,9 @@ void main() {
 
     test('janela sem hábitos agendados rende 0%', () {
       final rate = completionRate(
-        habits: [HabitPresence(weekdays: {7}, completedDays: {})], // só domingo
+        habits: [
+          HabitPresence(weekdays: {7}, completedDays: {}),
+        ], // só domingo
         today: DateTime(2026, 11, 9), // segunda... janela 1 dia segunda
         windowDays: 1,
       );
@@ -179,10 +169,7 @@ void main() {
   group('overall streak', () {
     test('dia só conta quando todos os hábitos agendados foram feitos', () {
       final habits = [
-        HabitPresence(
-          weekdays: everyday(),
-          completedDays: {d(8), d(9), d(10)},
-        ),
+        HabitPresence(weekdays: everyday(), completedDays: {d(8), d(9), d(10)}),
         HabitPresence(
           weekdays: everyday(),
           completedDays: {d(8), d(10)}, // faltou o dia 9

@@ -19,31 +19,29 @@ String encodeWeekdays(Set<int> days) {
 }
 
 class HabitSnapshot {
-  const HabitSnapshot({
-    required this.habits,
-    required this.completions,
-  });
+  const HabitSnapshot({required this.habits, required this.completions});
 
   final List<Habit> habits;
   final List<Completion> completions;
 
   Set<DateTime> completedDaysFor(int habitId) => dateKeysToDates(
-        completions.where((c) => c.habitId == habitId).map((c) => c.day),
-      );
+    completions.where((c) => c.habitId == habitId).map((c) => c.day),
+  );
 
   bool isCompleted(int habitId, DateTime day) =>
       completions.any((c) => c.habitId == habitId && c.day == dateKey(day));
 
-  List<Habit> habitsScheduledOn(DateTime day) =>
-      habits.where((h) => isScheduledOn(parseWeekdays(h.weekdays), day)).toList();
+  List<Habit> habitsScheduledOn(DateTime day) => habits
+      .where((h) => isScheduledOn(parseWeekdays(h.weekdays), day))
+      .toList();
 
   List<HabitPresence> toPresence() => [
-        for (final habit in habits)
-          HabitPresence(
-            weekdays: parseWeekdays(habit.weekdays),
-            completedDays: completedDaysFor(habit.id),
-          ),
-      ];
+    for (final habit in habits)
+      HabitPresence(
+        weekdays: parseWeekdays(habit.weekdays),
+        completedDays: completedDaysFor(habit.id),
+      ),
+  ];
 }
 
 class HabitRepository {

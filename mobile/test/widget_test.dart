@@ -27,6 +27,7 @@ void main() {
             return db;
           }),
           adsEnabledProvider.overrideWithValue(false),
+          reminderSyncEnabledProvider.overrideWithValue(false),
         ],
         child: const HabitlyApp(),
       ),
@@ -63,10 +64,7 @@ void main() {
     await tester.tap(find.text('Estatísticas'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(
-      find.textContaining('As estatísticas aparecem'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('As estatísticas aparecem'), findsOneWidget);
     await disposeApp(tester);
   });
 
@@ -75,9 +73,29 @@ void main() {
     await tester.tap(find.byType(FloatingActionButton));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('Novo hábito'), findsOneWidget);
+    expect(find.widgetWithText(AppBar, 'Novo hábito'), findsOneWidget);
     expect(find.text('Nome'), findsOneWidget);
     expect(find.text('Dias da semana'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Lembrete'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Lembrete'), findsOneWidget);
+    await disposeApp(tester);
+  });
+
+  testWidgets('configurações mostram o toggle de lembretes', (tester) async {
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Configurações'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Lembretes de hábitos'), findsOneWidget);
+    final toggle = find.byType(Switch);
+    expect(tester.widget<Switch>(toggle).value, isTrue);
+    await tester.tap(toggle);
+    await tester.pump();
+    expect(tester.widget<Switch>(toggle).value, isFalse);
     await disposeApp(tester);
   });
 
@@ -92,19 +110,20 @@ void main() {
 
     await pumpApp(tester, database: db);
     expect(find.text('Beber água'), findsOneWidget);
-    expect(find.byType(Checkbox), findsOneWidget);
+    final check = find.byKey(const ValueKey('habit-check'));
+    expect(check, findsOneWidget);
+    expect(find.text('0 de 1 concluídos'), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle), findsNothing);
 
-    final before = tester.widget<Checkbox>(find.byType(Checkbox));
-    expect(before.value, isFalse);
-
-    await tester.tap(find.byType(Checkbox));
+    await tester.tap(check);
     await tester.pump();
     for (var i = 0; i < 20; i++) {
-      final box = tester.widget<Checkbox>(find.byType(Checkbox));
-      if (box.value == true) break;
+      if (find.byIcon(Icons.check_circle).evaluate().isNotEmpty) break;
       await tester.pump(const Duration(milliseconds: 50));
     }
-    expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isTrue);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byIcon(Icons.check_circle), findsOneWidget);
+    expect(find.text('Tudo feito!'), findsOneWidget);
     await disposeApp(tester);
   });
 }

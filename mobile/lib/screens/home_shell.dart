@@ -1,27 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:habitly/providers/providers.dart';
 import 'package:habitly/screens/calendar_screen.dart';
 import 'package:habitly/screens/stats_screen.dart';
 import 'package:habitly/screens/today_screen.dart';
 import 'package:habitly/widgets/ad_banner.dart';
 
-class HomeShell extends StatefulWidget {
+class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
 
   @override
-  State<HomeShell> createState() => _HomeShellState();
+  ConsumerState<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
 
-  final _pages = const [
-    TodayScreen(),
-    CalendarScreen(),
-    StatsScreen(),
-  ];
+  final _pages = const [TodayScreen(), CalendarScreen(), StatsScreen()];
 
   @override
   Widget build(BuildContext context) {
+    // Mantém os lembretes agendados em sincronia com os hábitos.
+    ref.watch(reminderSyncProvider);
     return Scaffold(
       body: IndexedStack(index: _index, children: _pages),
       bottomNavigationBar: Column(

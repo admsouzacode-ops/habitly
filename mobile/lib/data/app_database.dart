@@ -8,47 +8,66 @@ class Habits extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text().withLength(min: 1, max: 80)();
   TextColumn get icon => text().withDefault(const Constant('🌱'))();
-  IntColumn get colorValue => integer().withDefault(const Constant(0xFF2E7D32))();
+  IntColumn get colorValue =>
+      integer().withDefault(const Constant(0xFF2E7D32))();
+
   /// Dias da semana ISO separados por vírgula: 1=seg ... 7=dom.
-  TextColumn get weekdays => text().withDefault(const Constant('1,2,3,4,5,6,7'))();
-  /// Horário de lembrete (HH:mm). Não agenda notificação nesta versão.
+  TextColumn get weekdays =>
+      text().withDefault(const Constant('1,2,3,4,5,6,7'))();
+
+  /// Horário de lembrete (HH:mm) nos dias de [weekdays]. Nulo = sem lembrete.
   TextColumn get reminder => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
 
+@TableIndex(name: 'idx_completions_day', columns: {#day})
 class Completions extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get habitId =>
       integer().references(Habits, #id, onDelete: KeyAction.cascade)();
+
   /// Dia local no formato YYYY-MM-DD.
   TextColumn get day => text()();
-  DateTimeColumn get completedAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get completedAt =>
+      dateTime().withDefault(currentDateAndTime)();
 
   @override
   List<Set<Column>> get uniqueKeys => [
-        {habitId, day},
-      ];
+    {habitId, day},
+  ];
 }
 
 @DriftDatabase(tables: [Habits, Completions])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor])
-      : super(executor ?? driftDatabase(name: 'habitly'));
+    : super(executor ?? driftDatabase(name: 'habitly'));
 
   AppDatabase.memory() : super(NativeDatabase.memory());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) async {
-          await m.createAll();
-        },
-        beforeOpen: (details) async {
-          await customStatement('PRAGMA foreign_keys = ON');
-        },
-      );
+    onCreate: (m) async {
+      await m.createAll();
+    },
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        // v2 (app 1.0.0+5): lembretes passam a disparar notificações.
+        // Índice para consultas por dia e limpeza de horários inválidos
+        // gravados pela v1 (o campo era só informativo).
+        await m.createIndex(idxCompletionsDay);
+        await customStatement(
+          "UPDATE habits SET reminder = NULL "
+          "WHERE reminder IS NOT NULL AND reminder NOT GLOB '[0-2][0-9]:[0-5][0-9]'",
+        );
+      }
+    },
+    beforeOpen: (details) async {
+      await customStatement('PRAGMA foreign_keys = ON');
+    },
+  );
 
   Stream<List<Habit>> watchHabits() =>
       (select(habits)..orderBy([(t) => OrderingTerm.asc(t.createdAt)])).watch();
@@ -77,14 +96,14 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<Completion>> watchCompletions() => select(completions).watch();
 
   Stream<List<Completion>> watchCompletionsInRange(String from, String to) =>
-      (select(completions)
-            ..where((t) => t.day.isBetweenValues(from, to)))
-          .watch();
+      (select(
+        completions,
+      )..where((t) => t.day.isBetweenValues(from, to))).watch();
 
   Future<List<Completion>> completionsInRange(String from, String to) =>
-      (select(completions)
-            ..where((t) => t.day.isBetweenValues(from, to)))
-          .get();
+      (select(
+        completions,
+      )..where((t) => t.day.isBetweenValues(from, to))).get();
 
   Future<List<Completion>> allCompletions() => select(completions).get();
 
@@ -99,9 +118,9 @@ class AppDatabase extends _$AppDatabase {
         mode: InsertMode.insertOrIgnore,
       );
     } else {
-      await (delete(completions)
-            ..where((t) => t.habitId.equals(habitId) & t.day.equals(day)))
-          .go();
+      await (delete(
+        completions,
+      )..where((t) => t.habitId.equals(habitId) & t.day.equals(day))).go();
     }
   }
 }

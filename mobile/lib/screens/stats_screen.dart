@@ -4,6 +4,7 @@ import 'package:habitly/data/habit_repository.dart';
 import 'package:habitly/logic/dates.dart';
 import 'package:habitly/logic/habit_stats.dart';
 import 'package:habitly/providers/providers.dart';
+import 'package:habitly/widgets/empty_state.dart';
 
 class StatsScreen extends ConsumerWidget {
   const StatsScreen({super.key});
@@ -34,17 +35,18 @@ class _StatsBody extends StatelessWidget {
     final current = overallCurrentStreak(habits: presence, today: today);
     final record = overallRecordStreak(habits: presence, today: today);
     final week = completionRate(habits: presence, today: today, windowDays: 7);
-    final month = completionRate(habits: presence, today: today, windowDays: 30);
+    final month = completionRate(
+      habits: presence,
+      today: today,
+      windowDays: 30,
+    );
 
     if (snapshot.habits.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32),
-          child: Text(
+      return const EmptyState(
+        icon: Icons.insights_outlined,
+        title: 'Sem dados por enquanto',
+        message:
             'As estatísticas aparecem depois que você cria hábitos e marca conclusões.',
-            textAlign: TextAlign.center,
-          ),
-        ),
       );
     }
 
@@ -169,9 +171,7 @@ class _HabitStatTile extends StatelessWidget {
       today: today,
     );
     final week = completionRate(
-      habits: [
-        HabitPresence(weekdays: weekdays, completedDays: days),
-      ],
+      habits: [HabitPresence(weekdays: weekdays, completedDays: days)],
       today: today,
       windowDays: 7,
     );

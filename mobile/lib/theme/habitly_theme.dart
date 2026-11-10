@@ -38,7 +38,7 @@ ThemeData buildHabitlyTheme() {
   final scheme = ColorScheme.fromSeed(
     seedColor: habitlySeed,
     brightness: Brightness.light,
-  );
+  ).copyWith(primary: habitlyGreen);
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
@@ -72,9 +72,22 @@ ThemeData buildHabitlyTheme() {
     floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: scheme.primary,
       foregroundColor: scheme.onPrimary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
     ),
     inputDecorationTheme: InputDecorationTheme(
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
     ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(0, 52),
+        shape: const StadiumBorder(),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      ),
+    ),
+    chipTheme: ChipThemeData(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+    snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
+    dividerTheme: DividerThemeData(color: scheme.outlineVariant, space: 24),
   );
 }

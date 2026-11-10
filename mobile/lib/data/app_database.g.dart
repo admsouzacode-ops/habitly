@@ -209,7 +209,7 @@ class Habit extends DataClass implements Insertable<Habit> {
   /// Dias da semana ISO separados por vírgula: 1=seg ... 7=dom.
   final String weekdays;
 
-  /// Horário de lembrete (HH:mm). Não agenda notificação nesta versão.
+  /// Horário de lembrete (HH:mm) nos dias de [weekdays]. Nulo = sem lembrete.
   final String? reminder;
   final DateTime createdAt;
   const Habit({
@@ -760,11 +760,19 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $HabitsTable habits = $HabitsTable(this);
   late final $CompletionsTable completions = $CompletionsTable(this);
+  late final Index idxCompletionsDay = Index(
+    'idx_completions_day',
+    'CREATE INDEX idx_completions_day ON completions (day)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [habits, completions];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+    habits,
+    completions,
+    idxCompletionsDay,
+  ];
 }
 
 typedef $$HabitsTableCreateCompanionBuilder =

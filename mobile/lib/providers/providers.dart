@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:habitly/data/app_database.dart';
 import 'package:habitly/data/habit_repository.dart';
+import 'package:habitly/logic/reminder_schedule.dart';
+import 'package:habitly/services/reminder_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const freeHabitLimit = 5;
@@ -29,8 +31,7 @@ final habitSnapshotProvider = StreamProvider<HabitSnapshot>((ref) {
 });
 
 class PremiumNotifier extends StateNotifier<bool> {
-  PremiumNotifier(this._prefs)
-      : super(_prefs.getBool(premiumPrefKey) ?? false);
+  PremiumNotifier(this._prefs) : super(_prefs.getBool(premiumPrefKey) ?? false);
 
   final SharedPreferences _prefs;
 
@@ -42,7 +43,58 @@ class PremiumNotifier extends StateNotifier<bool> {
   Future<void> toggle() => setPremium(!state);
 }
 
-final premiumProvider =
-    StateNotifierProvider<PremiumNotifier, bool>((ref) {
+final premiumProvider = StateNotifierProvider<PremiumNotifier, bool>((ref) {
   return PremiumNotifier(ref.watch(sharedPreferencesProvider));
+});
+
+const remindersPrefKey = 'reminders_enabled';
+
+final reminderServiceProvider = Provider<ReminderService>((ref) {
+  return ReminderService(LocalNotificationsBackend());
+});
+
+final habitsProvider = StreamProvider<List<Habit>>((ref) {
+  return ref.watch(databaseProvider).watchHabits();
+});
+
+class RemindersEnabledNotifier extends StateNotifier<bool> {
+  RemindersEnabledNotifier(this._prefs)
+    : super(_prefs.getBool(remindersPrefKey) ?? true);
+
+  final SharedPreferences _prefs;
+
+  Future<void> set(bool value) async {
+    await _prefs.setBool(remindersPrefKey, value);
+    state = value;
+  }
+}
+
+final remindersEnabledProvider =
+    StateNotifierProvider<RemindersEnabledNotifier, bool>((ref) {
+      return RemindersEnabledNotifier(ref.watch(sharedPreferencesProvider));
+    });
+
+List<ReminderHabit> toReminderHabits(Iterable<Habit> habits) => [
+  for (final h in habits)
+    ReminderHabit(
+      id: h.id,
+      name: h.name,
+      icon: h.icon,
+      weekdays: parseWeekdays(h.weekdays),
+      reminder: h.reminder,
+    ),
+];
+
+/// Mantém as notificações agendadas em sincronia com os hábitos e o toggle.
+/// Desligado em testes de widget (sem plugin nativo).
+final reminderSyncEnabledProvider = Provider<bool>((ref) => true);
+
+final reminderSyncProvider = Provider<void>((ref) {
+  if (!ref.watch(reminderSyncEnabledProvider)) return;
+  final enabled = ref.watch(remindersEnabledProvider);
+  final habits = ref.watch(habitsProvider).valueOrNull;
+  if (habits == null) return;
+  ref
+      .read(reminderServiceProvider)
+      .sync(toReminderHabits(habits), enabled: enabled);
 });

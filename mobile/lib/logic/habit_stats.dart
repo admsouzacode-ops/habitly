@@ -44,8 +44,9 @@ int recordStreak({
   if (weekdays.isEmpty) return 0;
   final done = completedDays.map(dateOnly).toSet();
   final last = dateOnly(today);
-  final scheduledDone = done.where((d) => !d.isAfter(last) && isScheduledOn(weekdays, d)).toList()
-    ..sort();
+  final scheduledDone =
+      done.where((d) => !d.isAfter(last) && isScheduledOn(weekdays, d)).toList()
+        ..sort();
   if (scheduledDone.isEmpty) return 0;
 
   var best = 0;
@@ -66,17 +67,15 @@ int recordStreak({
 }
 
 class HabitPresence {
-  const HabitPresence({
-    required this.weekdays,
-    required this.completedDays,
-  });
+  const HabitPresence({required this.weekdays, required this.completedDays});
 
   final Set<int> weekdays;
   final Set<DateTime> completedDays;
 
   bool scheduledOn(DateTime day) => isScheduledOn(weekdays, day);
 
-  bool completedOn(DateTime day) => completedDays.map(dateOnly).contains(dateOnly(day));
+  bool completedOn(DateTime day) =>
+      completedDays.map(dateOnly).contains(dateOnly(day));
 }
 
 /// Um dia "completo" no app: há pelo menos um hábito agendado e todos
@@ -180,8 +179,7 @@ CompletionRate completionRate({
 CompletionRate dayCompletion({
   required List<HabitPresence> habits,
   required DateTime day,
-}) =>
-    completionRate(habits: habits, today: dateOnly(day), windowDays: 1);
+}) => completionRate(habits: habits, today: dateOnly(day), windowDays: 1);
 
 bool _hasScheduled(List<HabitPresence> habits, DateTime day) =>
     habits.any((h) => h.scheduledOn(day));

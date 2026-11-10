@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Recursos usados por nome via flutter_local_notifications: não remover no shrink. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_habitly,@mipmap/ic_launcher" />

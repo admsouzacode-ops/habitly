@@ -4,6 +4,7 @@ import 'package:habitly/data/habit_repository.dart';
 import 'package:habitly/logic/dates.dart';
 import 'package:habitly/logic/habit_stats.dart';
 import 'package:habitly/providers/providers.dart';
+import 'package:habitly/widgets/empty_state.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 class CalendarScreen extends ConsumerStatefulWidget {
@@ -79,12 +80,27 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             ),
           ),
           calendarBuilders: CalendarBuilders(
-            defaultBuilder: (context, day, focused) =>
-                _dayCell(context, snapshot, day, selected: false, isToday: false),
-            todayBuilder: (context, day, focused) =>
-                _dayCell(context, snapshot, day, selected: false, isToday: true),
-            selectedBuilder: (context, day, focused) =>
-                _dayCell(context, snapshot, day, selected: true, isToday: isSameDay(day, today)),
+            defaultBuilder: (context, day, focused) => _dayCell(
+              context,
+              snapshot,
+              day,
+              selected: false,
+              isToday: false,
+            ),
+            todayBuilder: (context, day, focused) => _dayCell(
+              context,
+              snapshot,
+              day,
+              selected: false,
+              isToday: true,
+            ),
+            selectedBuilder: (context, day, focused) => _dayCell(
+              context,
+              snapshot,
+              day,
+              selected: true,
+              isToday: isSameDay(day, today),
+            ),
           ),
           onDaySelected: (selected, focused) {
             setState(() {
@@ -105,8 +121,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         const SizedBox(height: 8),
         if (snapshot.habits.isEmpty)
           const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Crie um hábito para ver o histórico aqui.'),
+            padding: EdgeInsets.only(top: 8),
+            child: EmptyState(
+              icon: Icons.calendar_month_outlined,
+              title: 'Histórico vazio',
+              message:
+                  'Crie um hábito na aba Hoje para acompanhar seus dias aqui.',
+            ),
           )
         else if (dueToday.isEmpty)
           const Padding(
@@ -117,7 +138,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           ...dueToday.map((habit) {
             final done = snapshot.isCompleted(habit.id, _selected);
             return ListTile(
-              leading: Text(habit.icon, style: const TextStyle(fontSize: 22)),
+              leading: CircleAvatar(
+                backgroundColor: Color(
+                  habit.colorValue,
+                ).withValues(alpha: 0.15),
+                child: Text(habit.icon, style: const TextStyle(fontSize: 20)),
+              ),
               title: Text(habit.name),
               trailing: Icon(
                 done ? Icons.check_circle : Icons.radio_button_unchecked,

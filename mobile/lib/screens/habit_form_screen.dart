@@ -67,14 +67,27 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_weekdays.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Escolha pelo menos um dia da semana.'),
-        ),
+        const SnackBar(content: Text('Escolha pelo menos um dia da semana.')),
       );
       return;
     }
     setState(() => _saving = true);
     final repo = ref.read(habitRepositoryProvider);
+    if (_reminder != null && ref.read(reminderSyncEnabledProvider)) {
+      final granted = await ref
+          .read(reminderServiceProvider)
+          .requestPermission();
+      if (!granted && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Sem permissão de notificação o lembrete não vai aparecer. '
+              'Você pode liberar nas configurações do Android.',
+            ),
+          ),
+        );
+      }
+    }
     try {
       if (_isEditing) {
         await repo.updateHabit(
@@ -131,16 +144,17 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
       context: context,
       initialTime: _reminder ?? const TimeOfDay(hour: 8, minute: 0),
       helpText: 'Horário do lembrete',
-      cancelText: 'Limpar',
+      cancelText: 'Cancelar',
       confirmText: 'OK',
     );
-    // showTimePicker returns null on cancel. We still offer an explicit clear.
-    if (!mounted) return;
+    if (!mounted || picked == null) return;
     setState(() => _reminder = picked);
   }
 
   @override
   Widget build(BuildContext context) {
+    final remindersOn = ref.watch(remindersEnabledProvider);
+    final color = Color(_colorValue);
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Editar hábito' : 'Novo hábito'),
@@ -158,6 +172,16 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: CircleAvatar(
+                  radius: 36,
+                  backgroundColor: color.withValues(alpha: 0.15),
+                  child: Text(_icon, style: const TextStyle(fontSize: 34)),
+                ),
+              ),
+            ),
             TextFormField(
               controller: _nameController,
               textCapitalization: TextCapitalization.sentences,
@@ -205,14 +229,21 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
                       radius: 18,
                       backgroundColor: color,
                       child: _colorValue == color.toARGB32()
-                          ? const Icon(Icons.check, color: Colors.white, size: 18)
+                          ? const Icon(
+                              Icons.check,
+                              color: Colors.white,
+                              size: 18,
+                            )
                           : null,
                     ),
                   ),
               ],
             ),
             const SizedBox(height: 24),
-            Text('Dias da semana', style: Theme.of(context).textTheme.titleSmall),
+            Text(
+              'Dias da semana',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
             const SizedBox(height: 8),
             WeekdaySelector(
               selected: _weekdays,
@@ -221,13 +252,18 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
             const SizedBox(height: 24),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.alarm_outlined),
-              title: const Text('Lembrete (opcional)'),
+              leading: Icon(
+                _reminder == null ? Icons.alarm_add_outlined : Icons.alarm_on,
+                color: _reminder == null ? null : color,
+              ),
+              title: const Text('Lembrete'),
               subtitle: Text(
                 _reminder == null
-                    ? 'Nenhum horário definido. O campo é só um registro, '
-                        'sem notificação por enquanto.'
-                    : 'Horário: ${_reminder!.format(context)}',
+                    ? 'Toque para receber um aviso nos dias escolhidos.'
+                    : remindersOn
+                    ? 'Aviso às ${_reminder!.format(context)} nos dias escolhidos'
+                    : 'Às ${_reminder!.format(context)} · lembretes desligados '
+                          'nas Configurações',
               ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
