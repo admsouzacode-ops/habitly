@@ -5,7 +5,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.10.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -16,9 +16,9 @@ dependencies:
   path: ^1.8.3
   dio: ^5.4.0
   shared_preferences: ^2.2.0
-  google_mobile_ads: ^4.0.0
+  google_mobile_ads: ^9.2.0
   in_app_purchase: ^3.1.0
-  flutter_local_notifications: ^16.0.0
+  flutter_local_notifications: ^23.0.0
 
 dev_dependencies:
   flutter_test:
