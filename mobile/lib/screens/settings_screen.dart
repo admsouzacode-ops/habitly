@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:habitly/providers/providers.dart';
+import 'package:habitly/screens/achievements_screen.dart';
 
-const appVersionLabel = 'Versão 1.0.0 (5)';
+const appVersionLabel = 'Versão 1.0.0 (7)';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -100,6 +101,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: _askExact,
             ),
+          const Divider(),
+          const _SectionHeader('Progresso'),
+          ListTile(
+            leading: const Icon(Icons.emoji_events_outlined),
+            title: const Text('Conquistas'),
+            subtitle: const Text('Medalhas por sequências e conclusões.'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const AchievementsScreen(),
+              ),
+            ),
+          ),
+          const ListTile(
+            leading: Icon(Icons.widgets_outlined),
+            title: Text('Widget na tela inicial'),
+            subtitle: Text(
+              'Segure um espaço vazio da tela inicial, toque em Widgets e '
+              'arraste o Habitly para marcar hábitos sem abrir o app.',
+            ),
+          ),
           const Divider(),
           const _SectionHeader('Conta'),
           const ListTile(

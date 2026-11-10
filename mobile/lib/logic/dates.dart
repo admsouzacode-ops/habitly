@@ -34,3 +34,13 @@ String capitalizedDateHeading(DateTime date) {
   if (raw.isEmpty) return raw;
   return raw[0].toUpperCase() + raw.substring(1);
 }
+
+/// Soma [days] dias de calendário (seguro em mudanças de horário de verão).
+DateTime addDays(DateTime date, int days) =>
+    DateTime(date.year, date.month, date.day + days);
+
+/// Segunda-feira (início da semana ISO) da semana de [date].
+DateTime weekStart(DateTime date) {
+  final d = dateOnly(date);
+  return addDays(d, -(d.weekday - 1));
+}

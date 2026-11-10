@@ -18,6 +18,23 @@ class Habits extends Table {
   /// Horário de lembrete (HH:mm) nos dias de [weekdays]. Nulo = sem lembrete.
   TextColumn get reminder => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  /// Tipo de meta (v4, app 1.0.0+7): 'daily' (dias da semana), 'weekly'
+  /// (X vezes por semana, qualquer dia) ou 'quantity' (quantidade por dia).
+  /// Hábitos antigos ficam 'daily'.
+  TextColumn get goalType => text().withDefault(const Constant('daily'))();
+
+  /// Meta semanal (vezes por semana) quando goalType = 'weekly'.
+  IntColumn get weeklyTarget => integer().withDefault(const Constant(3))();
+
+  /// Meta diária quando goalType = 'quantity' (ex.: 2 litros, 8 copos).
+  RealColumn get quantityTarget => real().withDefault(const Constant(1))();
+
+  /// Unidade da meta de quantidade (ex.: 'litros', 'copos', 'min').
+  TextColumn get quantityUnit => text().withDefault(const Constant(''))();
+
+  /// Incremento do botão + (e do widget) para metas de quantidade.
+  RealColumn get quantityStep => real().withDefault(const Constant(1))();
 }
 
 @TableIndex(name: 'idx_completions_day', columns: {#day})
@@ -66,7 +83,27 @@ class HabitDayNotes extends Table {
   ];
 }
 
-@DriftDatabase(tables: [Habits, Completions, HabitDayNotes])
+/// Progresso do dia em hábitos de quantidade (v4, app 1.0.0+7). A conclusão
+/// do dia continua sendo uma linha em [Completions], gravada quando o valor
+/// atinge a meta, para histórico/estatísticas seguirem funcionando.
+class HabitAmounts extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get habitId => integer().customConstraint(
+    'NOT NULL REFERENCES habits(id) ON DELETE CASCADE',
+  )();
+
+  /// Dia local no formato YYYY-MM-DD.
+  TextColumn get day => text()();
+  RealColumn get amount => real().withDefault(const Constant(0))();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+    {habitId, day},
+  ];
+}
+
+@DriftDatabase(tables: [Habits, Completions, HabitDayNotes, HabitAmounts])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor])
     : super(executor ?? driftDatabase(name: 'habitly'));
@@ -74,7 +111,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.memory() : super(NativeDatabase.memory());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -97,9 +134,23 @@ class AppDatabase extends _$AppDatabase {
         // hábitos e conclusões existentes não são tocados.
         await m.createTable(habitDayNotes);
       }
+      if (from < 4) {
+        // v4 (app 1.0.0+7): metas flexíveis. Colunas novas com DEFAULT, então
+        // todos os hábitos existentes viram 'daily' com os mesmos dias da
+        // semana; conclusões e notas não são tocadas.
+        await m.addColumn(habits, habits.goalType);
+        await m.addColumn(habits, habits.weeklyTarget);
+        await m.addColumn(habits, habits.quantityTarget);
+        await m.addColumn(habits, habits.quantityUnit);
+        await m.addColumn(habits, habits.quantityStep);
+        await m.createTable(habitAmounts);
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
+      // O widget da tela inicial grava pelo isolate de segundo plano; espera
+      // o lock em vez de falhar com SQLITE_BUSY.
+      await customStatement('PRAGMA busy_timeout = 5000');
     },
   );
 
@@ -126,6 +177,7 @@ class AppDatabase extends _$AppDatabase {
     // As FKs já têm ON DELETE CASCADE; a limpeza explícita garante o mesmo
     // resultado mesmo se foreign_keys estiver desligado.
     await (delete(habitDayNotes)..where((t) => t.habitId.equals(id))).go();
+    await (delete(habitAmounts)..where((t) => t.habitId.equals(id))).go();
     await (delete(completions)..where((t) => t.habitId.equals(id))).go();
     await (delete(habits)..where((t) => t.id.equals(id))).go();
   });
@@ -204,4 +256,46 @@ class AppDatabase extends _$AppDatabase {
   Future<int> deleteNote(int habitId, String day) => (delete(
     habitDayNotes,
   )..where((t) => t.habitId.equals(habitId) & t.day.equals(day))).go();
+
+  Future<List<HabitAmount>> allAmounts() => select(habitAmounts).get();
+
+  Future<HabitAmount?> amountFor(int habitId, String day) =>
+      (select(habitAmounts)
+            ..where((t) => t.habitId.equals(habitId) & t.day.equals(day)))
+          .getSingleOrNull();
+
+  /// Grava o valor do dia e mantém a conclusão em sincronia com a meta.
+  Future<void> setAmount({
+    required int habitId,
+    required String day,
+    required double amount,
+    required double target,
+  }) => transaction(() async {
+    if (amount <= 0) {
+      await (delete(
+        habitAmounts,
+      )..where((t) => t.habitId.equals(habitId) & t.day.equals(day))).go();
+    } else {
+      await into(habitAmounts).insert(
+        HabitAmountsCompanion.insert(
+          habitId: habitId,
+          day: day,
+          amount: Value(amount),
+          updatedAt: Value(DateTime.now()),
+        ),
+        onConflict: DoUpdate(
+          (_) => HabitAmountsCompanion(
+            amount: Value(amount),
+            updatedAt: Value(DateTime.now()),
+          ),
+          target: [habitAmounts.habitId, habitAmounts.day],
+        ),
+      );
+    }
+    await setCompleted(
+      habitId: habitId,
+      day: day,
+      completed: amount > 0 && amount + 1e-9 >= target,
+    );
+  });
 }

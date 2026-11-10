@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:habitly/data/app_database.dart';
 import 'package:habitly/data/habit_repository.dart';
 import 'package:habitly/logic/dates.dart';
-import 'package:habitly/logic/habit_stats.dart';
+import 'package:habitly/logic/goals.dart';
 import 'package:habitly/providers/providers.dart';
+import 'package:habitly/screens/habit_detail_screen.dart';
 import 'package:habitly/screens/habit_form_screen.dart';
 import 'package:habitly/screens/settings_screen.dart';
 import 'package:habitly/widgets/day_note_sheet.dart';
@@ -98,7 +99,7 @@ class _TodayBody extends ConsumerWidget {
       );
     }
 
-    final due = snapshot.habitsScheduledOn(today);
+    final due = snapshot.habitsDueOn(today);
     final others = snapshot.habits
         .where((h) => !due.any((d) => d.id == h.id))
         .toList();
@@ -248,30 +249,53 @@ class _HabitCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final goal = snapshot.goalFor(habit);
     final done = snapshot.isCompleted(habit.id, today);
-    final streak = currentStreak(
-      weekdays: parseWeekdays(habit.weekdays),
-      completedDays: snapshot.completedDaysFor(habit.id),
-      today: today,
-    );
+    final streak = snapshot.streakOf(habit, today);
     final color = Color(habit.colorValue);
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final remindersOn = ref.watch(remindersEnabledProvider);
     final note = snapshot.noteFor(habit.id, today);
+    final repo = ref.read(habitRepositoryProvider);
     void openNote() =>
         showDayNoteSheet(context, habit: habit, day: today, existing: note);
 
+    final weekCount = snapshot.weekCount(habit.id, today);
+    final amount = snapshot.amountFor(habit.id, today);
+    final weekMet = goal.isWeekly && weekCount >= goal.safeWeeklyTarget;
+    final streakText = streak.current > 0 ? streak.currentText : null;
+
     final String status;
-    if (!scheduledToday) {
-      status = 'Não agendado para hoje';
-    } else if (streak == 0) {
-      status = done ? 'Feito hoje' : 'Comece a sequência hoje';
-    } else {
-      status = '🔥 $streak ${streak == 1 ? 'dia' : 'dias'} seguidos';
+    switch (goal.type) {
+      case GoalType.weekly:
+        final base = weekMet
+            ? '✅ $weekCount/${goal.safeWeeklyTarget} esta semana'
+            : '$weekCount/${goal.safeWeeklyTarget} esta semana';
+        status = streakText == null ? base : '$base · $streakText';
+      case GoalType.quantity:
+        final unit = goal.quantityUnit.trim();
+        final base =
+            '${formatAmount(amount)}/${formatAmount(goal.safeQuantityTarget)}'
+            '${unit.isEmpty ? '' : ' $unit'}';
+        status = !scheduledToday
+            ? 'Não agendado para hoje'
+            : streakText == null
+            ? base
+            : '$base · $streakText';
+      case GoalType.daily:
+        if (!scheduledToday) {
+          status = 'Não agendado para hoje';
+        } else if (streakText == null) {
+          status = done ? 'Feito hoje' : 'Comece a sequência hoje';
+        } else {
+          status = streakText;
+        }
     }
+    final struck = goal.isWeekly ? weekMet : done;
 
     return Card(
+      key: ValueKey('habit-card-${habit.id}'),
       margin: const EdgeInsets.only(bottom: 10),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -279,7 +303,7 @@ class _HabitCard extends ConsumerWidget {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => HabitFormScreen(habit: habit),
+              builder: (_) => HabitDetailScreen(habitId: habit.id),
             ),
           );
         },
@@ -308,8 +332,10 @@ class _HabitCard extends ConsumerWidget {
                       Text(
                         habit.name,
                         style: textTheme.titleMedium?.copyWith(
-                          decoration: done ? TextDecoration.lineThrough : null,
-                          color: done ? scheme.onSurfaceVariant : null,
+                          decoration: struck
+                              ? TextDecoration.lineThrough
+                              : null,
+                          color: struck ? scheme.onSurfaceVariant : null,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -317,7 +343,11 @@ class _HabitCard extends ConsumerWidget {
                         spacing: 10,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          Text(status, style: textTheme.bodySmall),
+                          Text(
+                            status,
+                            key: ValueKey('habit-status-${habit.id}'),
+                            style: textTheme.bodySmall,
+                          ),
                           if (habit.reminder != null)
                             Row(
                               mainAxisSize: MainAxisSize.min,
@@ -338,6 +368,29 @@ class _HabitCard extends ConsumerWidget {
                             ),
                         ],
                       ),
+                      if (goal.isQuantity && scheduledToday) ...[
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: (amount / goal.safeQuantityTarget).clamp(
+                              0.0,
+                              1.0,
+                            ),
+                            minHeight: 6,
+                            color: color,
+                            backgroundColor: color.withValues(alpha: 0.15),
+                          ),
+                        ),
+                      ],
+                      if (goal.isWeekly) ...[
+                        const SizedBox(height: 6),
+                        _WeekDots(
+                          count: weekCount,
+                          target: goal.safeWeeklyTarget,
+                          color: color,
+                        ),
+                      ],
                       if (note != null) ...[
                         const SizedBox(height: 4),
                         NotePreview(note: note),
@@ -357,20 +410,28 @@ class _HabitCard extends ConsumerWidget {
                   color: note != null ? scheme.tertiary : scheme.outline,
                 ),
               ),
-              if (scheduledToday)
+              if (goal.isQuantity && scheduledToday)
+                _QuantityControls(
+                  habit: habit,
+                  goal: goal,
+                  amount: amount,
+                  done: done,
+                  color: color,
+                  onChanged: (value) =>
+                      repo.setAmount(habit: habit, day: today, amount: value),
+                )
+              else if (scheduledToday || goal.isWeekly)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: _CheckButton(
                     done: done,
                     color: color,
                     onChanged: (value) {
-                      ref
-                          .read(habitRepositoryProvider)
-                          .setCompleted(
-                            habitId: habit.id,
-                            day: today,
-                            completed: value,
-                          );
+                      repo.setCompleted(
+                        habitId: habit.id,
+                        day: today,
+                        completed: value,
+                      );
                     },
                   ),
                 )
@@ -385,6 +446,152 @@ class _HabitCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _WeekDots extends StatelessWidget {
+  const _WeekDots({
+    required this.count,
+    required this.target,
+    required this.color,
+  });
+
+  final int count;
+  final int target;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var i = 0; i < target; i++)
+          Container(
+            width: 10,
+            height: 10,
+            margin: const EdgeInsets.only(right: 4),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: i < count ? color : color.withValues(alpha: 0.18),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _QuantityControls extends StatelessWidget {
+  const _QuantityControls({
+    required this.habit,
+    required this.goal,
+    required this.amount,
+    required this.done,
+    required this.color,
+    required this.onChanged,
+  });
+
+  final Habit habit;
+  final HabitGoal goal;
+  final double amount;
+  final bool done;
+  final Color color;
+  final ValueChanged<double> onChanged;
+
+  Future<void> _input(BuildContext context) async {
+    final value = await showQuantityInputDialog(
+      context,
+      habit: habit,
+      goal: goal,
+      current: amount,
+    );
+    if (value != null) onChanged(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final step = goal.safeQuantityStep;
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            key: ValueKey('habit-minus-${habit.id}'),
+            tooltip: 'Diminuir ${formatAmount(step)}',
+            visualDensity: VisualDensity.compact,
+            onPressed: amount <= 0 ? null : () => onChanged(amount - step),
+            icon: const Icon(Icons.remove_circle_outline),
+          ),
+          InkWell(
+            key: ValueKey('habit-amount-${habit.id}'),
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => _input(context),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+              child: done
+                  ? Icon(Icons.check_circle, color: color, size: 26)
+                  : Text(
+                      formatAmount(amount),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+            ),
+          ),
+          IconButton(
+            key: ValueKey('habit-plus-${habit.id}'),
+            tooltip: 'Somar ${formatAmount(step)}',
+            visualDensity: VisualDensity.compact,
+            onPressed: () => onChanged(amount + step),
+            icon: Icon(Icons.add_circle, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Diálogo para digitar o valor do dia (ex.: 1,5 litro).
+Future<double?> showQuantityInputDialog(
+  BuildContext context, {
+  required Habit habit,
+  required HabitGoal goal,
+  required double current,
+}) {
+  final controller = TextEditingController(
+    text: current > 0 ? formatAmount(current) : '',
+  );
+  final unit = goal.quantityUnit.trim();
+  return showDialog<double>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('${habit.icon} ${habit.name}'),
+      content: TextField(
+        key: const ValueKey('quantity-input'),
+        controller: controller,
+        autofocus: true,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: InputDecoration(
+          labelText: 'Quanto hoje?',
+          suffixText: unit.isEmpty ? null : unit,
+          helperText:
+              'Meta: ${formatAmount(goal.safeQuantityTarget)}'
+              '${unit.isEmpty ? '' : ' $unit'}',
+        ),
+        onSubmitted: (raw) => Navigator.pop(context, parseAmount(raw)),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, parseAmount(controller.text)),
+          child: const Text('Salvar'),
+        ),
+      ],
+    ),
+  );
 }
 
 class _CheckButton extends StatelessWidget {

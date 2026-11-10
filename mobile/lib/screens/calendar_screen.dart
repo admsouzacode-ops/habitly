@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:habitly/data/app_database.dart';
 import 'package:habitly/data/habit_repository.dart';
+import 'package:habitly/logic/goals.dart';
 import 'package:habitly/logic/dates.dart';
 import 'package:habitly/logic/habit_stats.dart';
 import 'package:habitly/providers/providers.dart';
@@ -159,6 +161,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   : null,
               subtitle: note != null
                   ? NotePreview(note: note, maxLines: 3)
+                  : snapshot.goalFor(habit).isQuantity
+                  ? Text(_quantityLabel(snapshot, habit, _selected))
                   : canNote && !done
                   ? Text(
                       'Toque para anotar por que não deu',
@@ -194,6 +198,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         ],
       ],
     );
+  }
+
+  String _quantityLabel(HabitSnapshot snapshot, Habit habit, DateTime day) {
+    final goal = snapshot.goalFor(habit);
+    final unit = goal.quantityUnit.trim();
+    return '${formatAmount(snapshot.amountFor(habit.id, day))}/'
+        '${formatAmount(goal.safeQuantityTarget)}${unit.isEmpty ? '' : ' $unit'}';
   }
 
   String _legend(CompletionRate rate) {

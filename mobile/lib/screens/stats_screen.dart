@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:habitly/data/habit_repository.dart';
+import 'package:habitly/logic/achievements.dart';
 import 'package:habitly/logic/dates.dart';
 import 'package:habitly/logic/habit_stats.dart';
 import 'package:habitly/logic/note_reasons.dart';
 import 'package:habitly/providers/providers.dart';
+import 'package:habitly/screens/achievements_screen.dart';
+import 'package:habitly/screens/habit_detail_screen.dart';
 import 'package:habitly/widgets/empty_state.dart';
 
 class StatsScreen extends ConsumerWidget {
@@ -14,7 +17,21 @@ class StatsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(habitSnapshotProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Estatísticas')),
+      appBar: AppBar(
+        title: const Text('Estatísticas'),
+        actions: [
+          IconButton(
+            key: const ValueKey('open-achievements'),
+            tooltip: 'Conquistas',
+            icon: const Icon(Icons.emoji_events_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const AchievementsScreen(),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Não foi possível carregar: $e')),
@@ -99,6 +116,8 @@ class _StatsBody extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        _AchievementsCard(snapshot: snapshot, today: today),
         const SizedBox(height: 24),
         _ReasonsSection(snapshot: snapshot),
         const SizedBox(height: 24),
@@ -161,20 +180,10 @@ class _HabitStatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final habit = snapshot.habits.firstWhere((h) => h.id == habitId);
-    final weekdays = parseWeekdays(habit.weekdays);
-    final days = snapshot.completedDaysFor(habit.id);
-    final current = currentStreak(
-      weekdays: weekdays,
-      completedDays: days,
-      today: today,
-    );
-    final record = recordStreak(
-      weekdays: weekdays,
-      completedDays: days,
-      today: today,
-    );
+    final goal = snapshot.goalFor(habit);
+    final streak = snapshot.streakOf(habit, today);
     final week = completionRate(
-      habits: [HabitPresence(weekdays: weekdays, completedDays: days)],
+      habits: [snapshot.presenceOf(habit)],
       today: today,
       windowDays: 7,
     );
@@ -182,13 +191,56 @@ class _HabitStatTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
+        key: ValueKey('stat-habit-${habit.id}'),
         leading: CircleAvatar(
           backgroundColor: Color(habit.colorValue).withValues(alpha: 0.15),
           child: Text(habit.icon, style: const TextStyle(fontSize: 20)),
         ),
         title: Text(habit.name),
         subtitle: Text(
-          'Sequência $current · recorde $record · 7 dias ${week.percent}%',
+          '${goal.summary()}\n'
+          '🔥 ${streak.current} ${streak.label(streak.current)} · recorde '
+          '${streak.best} · 7 dias ${week.percent}%',
+        ),
+        isThreeLine: true,
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => HabitDetailScreen(habitId: habit.id),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AchievementsCard extends ConsumerWidget {
+  const _AchievementsCard({required this.snapshot, required this.today});
+
+  final HabitSnapshot snapshot;
+  final DateTime today;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ledger = ref.watch(achievementLedgerProvider);
+    final computed = computeUnlocked(snapshot, today);
+    final unlocked = achievements
+        .where((a) => computed.contains(a.id) || ledger.isUnlocked(a.id))
+        .toList();
+    return Card(
+      key: const ValueKey('achievements-card'),
+      child: ListTile(
+        leading: const Text('🏆', style: TextStyle(fontSize: 28)),
+        title: const Text('Conquistas'),
+        subtitle: Text(
+          unlocked.isEmpty
+              ? 'Conclua hábitos para ganhar medalhas.'
+              : '${unlocked.length} de ${achievements.length} · '
+                    '${unlocked.map((a) => a.emoji).take(8).join(' ')}',
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const AchievementsScreen()),
         ),
       ),
     );

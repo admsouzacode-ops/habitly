@@ -57,3 +57,14 @@
 
 # flutter_timezone
 -keep class net.wolverinebeach.flutter_timezone.** { *; }
+
+# home_widget (1.0.0+7): widget da tela inicial. O WorkManager instancia o
+# HomeWidgetBackgroundWorker por reflexão (nome da classe salvo no banco do
+# WorkManager) e os receivers vêm do manifest; mantém tudo do plugin e o
+# provider do app para não repetir o crash de R8 da 1.0.0+2.
+-keep class es.antonborri.home_widget.** { *; }
+-keep class * extends androidx.work.ListenableWorker { <init>(...); }
+-keep class * extends androidx.work.CoroutineWorker { <init>(...); }
+-keep class * extends android.appwidget.AppWidgetProvider { *; }
+-keep class br.com.souzacode.habitly.** { *; }
+-dontwarn androidx.glance.**

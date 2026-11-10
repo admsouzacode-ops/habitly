@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:habitly/app.dart';
 import 'package:habitly/providers/providers.dart';
+import 'package:habitly/services/home_widget_service.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -15,6 +18,8 @@ Future<void> main() async {
   } catch (error, stack) {
     debugPrint('Mobile Ads não inicializou: $error\n$stack');
   }
+  // Widget da tela inicial: callback em segundo plano para marcar hábitos.
+  unawaited(registerHomeWidgetCallback());
   runApp(
     ProviderScope(
       overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],

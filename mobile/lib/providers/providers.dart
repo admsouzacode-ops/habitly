@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:habitly/data/app_database.dart';
 import 'package:habitly/data/habit_repository.dart';
+import 'package:habitly/logic/achievements.dart';
 import 'package:habitly/logic/reminder_schedule.dart';
 import 'package:habitly/services/reminder_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -98,3 +99,29 @@ final reminderSyncProvider = Provider<void>((ref) {
       .read(reminderServiceProvider)
       .sync(toReminderHabits(habits), enabled: enabled);
 });
+
+/// Desligado em testes de widget (sem plugin home_widget).
+final homeWidgetSyncEnabledProvider = Provider<bool>((ref) => true);
+
+class AchievementLedgerNotifier extends StateNotifier<AchievementLedger> {
+  AchievementLedgerNotifier(this._prefs)
+    : super(
+        AchievementLedger.decode(_prefs.getString(AchievementLedger.prefKey)),
+      );
+
+  final SharedPreferences _prefs;
+
+  /// Registra as conquistas recém-alcançadas e devolve só as novas.
+  Future<List<Achievement>> record(Set<String> computed) async {
+    final fresh = state.newlyUnlocked(computed);
+    if (fresh.isEmpty) return fresh;
+    state = state.merge(fresh.map((a) => a.id), DateTime.now());
+    await _prefs.setString(AchievementLedger.prefKey, state.encode());
+    return fresh;
+  }
+}
+
+final achievementLedgerProvider =
+    StateNotifierProvider<AchievementLedgerNotifier, AchievementLedger>((ref) {
+      return AchievementLedgerNotifier(ref.watch(sharedPreferencesProvider));
+    });

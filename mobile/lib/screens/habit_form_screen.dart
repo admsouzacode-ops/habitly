@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:habitly/data/app_database.dart';
 import 'package:habitly/data/habit_repository.dart';
+import 'package:habitly/logic/goals.dart';
 import 'package:habitly/providers/providers.dart';
 import 'package:habitly/theme/habitly_theme.dart';
 import 'package:habitly/widgets/weekday_selector.dart';
@@ -21,6 +22,11 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
   late String _icon;
   late int _colorValue;
   late Set<int> _weekdays;
+  late GoalType _goalType;
+  late int _weeklyTarget;
+  late final TextEditingController _targetController;
+  late final TextEditingController _unitController;
+  late final TextEditingController _stepController;
   TimeOfDay? _reminder;
   bool _saving = false;
 
@@ -37,7 +43,31 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
         ? {1, 2, 3, 4, 5, 6, 7}
         : parseWeekdays(habit.weekdays);
     _reminder = _parseReminder(habit?.reminder);
+    final goal = habit == null ? const HabitGoal() : goalOf(habit);
+    _goalType = goal.type;
+    _weeklyTarget = goal.safeWeeklyTarget;
+    if (goal.isWeekly) _weekdays = {1, 2, 3, 4, 5, 6, 7};
+    _targetController = TextEditingController(
+      text: habit != null && goal.isQuantity
+          ? formatAmount(goal.safeQuantityTarget)
+          : '',
+    );
+    _unitController = TextEditingController(
+      text: goal.isQuantity ? goal.quantityUnit : '',
+    );
+    _stepController = TextEditingController(
+      text: formatAmount(goal.isQuantity ? goal.safeQuantityStep : 1),
+    );
   }
+
+  HabitGoal _buildGoal() => HabitGoal(
+    type: _goalType,
+    weekdays: _goalType == GoalType.weekly ? allWeekdays : _weekdays,
+    weeklyTarget: _weeklyTarget,
+    quantityTarget: parseAmount(_targetController.text) ?? 1,
+    quantityUnit: _unitController.text.trim(),
+    quantityStep: parseAmount(_stepController.text) ?? 1,
+  );
 
   TimeOfDay? _parseReminder(String? raw) {
     if (raw == null || raw.isEmpty) return null;
@@ -60,12 +90,15 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _targetController.dispose();
+    _unitController.dispose();
+    _stepController.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_weekdays.isEmpty) {
+    if (_goalType != GoalType.weekly && _weekdays.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Escolha pelo menos um dia da semana.')),
       );
@@ -97,6 +130,7 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
           colorValue: _colorValue,
           weekdays: _weekdays,
           reminder: _encodeReminder(),
+          goal: _buildGoal(),
         );
       } else {
         await repo.addHabit(
@@ -105,6 +139,7 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
           colorValue: _colorValue,
           weekdays: _weekdays,
           reminder: _encodeReminder(),
+          goal: _buildGoal(),
         );
       }
       if (mounted) Navigator.of(context).pop(true);
@@ -240,15 +275,171 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            Text(
-              'Dias da semana',
-              style: Theme.of(context).textTheme.titleSmall,
+            Text('Meta', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            SegmentedButton<GoalType>(
+              key: const ValueKey('goal-type'),
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(
+                  value: GoalType.daily,
+                  icon: Icon(Icons.event_repeat_outlined),
+                  label: Text('Dias'),
+                ),
+                ButtonSegment(
+                  value: GoalType.weekly,
+                  icon: Icon(Icons.date_range_outlined),
+                  label: Text('Por semana'),
+                ),
+                ButtonSegment(
+                  value: GoalType.quantity,
+                  icon: Icon(Icons.straighten_outlined),
+                  label: Text('Quantidade'),
+                ),
+              ],
+              selected: {_goalType},
+              onSelectionChanged: (value) => setState(() {
+                _goalType = value.first;
+                if (_goalType == GoalType.weekly) {
+                  _weekdays = {1, 2, 3, 4, 5, 6, 7};
+                }
+              }),
             ),
             const SizedBox(height: 8),
-            WeekdaySelector(
-              selected: _weekdays,
-              onChanged: (days) => setState(() => _weekdays = days),
+            Text(
+              _buildGoal().summary(),
+              key: const ValueKey('goal-summary'),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
+            const SizedBox(height: 16),
+            if (_goalType == GoalType.weekly) ...[
+              Text(
+                'Quantas vezes por semana?',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  IconButton.filledTonal(
+                    tooltip: 'Menos',
+                    onPressed: _weeklyTarget <= 1
+                        ? null
+                        : () => setState(() => _weeklyTarget--),
+                    icon: const Icon(Icons.remove),
+                  ),
+                  Expanded(
+                    child: Text(
+                      '${_weeklyTarget}x por semana',
+                      key: const ValueKey('weekly-target'),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton.filledTonal(
+                    key: const ValueKey('weekly-plus'),
+                    tooltip: 'Mais',
+                    onPressed: _weeklyTarget >= 7
+                        ? null
+                        : () => setState(() => _weeklyTarget++),
+                    icon: const Icon(Icons.add),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Em qualquer dia da semana (seg a dom). A sequência conta '
+                'semanas seguidas com a meta batida.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (_goalType == GoalType.quantity) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      key: const ValueKey('quantity-target'),
+                      controller: _targetController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Meta por dia',
+                        hintText: 'Ex.: 2',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                      validator: (value) {
+                        if (_goalType != GoalType.quantity) return null;
+                        final v = parseAmount(value ?? '');
+                        if (v == null || v <= 0) return 'Informe a meta.';
+                        if (v > 100000) return 'Meta muito alta.';
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      key: const ValueKey('quantity-unit'),
+                      controller: _unitController,
+                      maxLength: 16,
+                      decoration: const InputDecoration(
+                        labelText: 'Unidade',
+                        hintText: 'Ex.: litros',
+                        counterText: '',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  for (final unit in quantityUnitSuggestions)
+                    ChoiceChip(
+                      label: Text(unit),
+                      selected: _unitController.text.trim() == unit,
+                      onSelected: (_) =>
+                          setState(() => _unitController.text = unit),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                key: const ValueKey('quantity-step'),
+                controller: _stepController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Quanto soma cada toque no +',
+                  hintText: 'Ex.: 1 ou 0,5',
+                ),
+                validator: (value) {
+                  if (_goalType != GoalType.quantity) return null;
+                  final v = parseAmount(value ?? '');
+                  if (v == null || v <= 0) return 'Informe o incremento.';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+            if (_goalType != GoalType.weekly) ...[
+              Text(
+                'Dias da semana',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+              WeekdaySelector(
+                selected: _weekdays,
+                onChanged: (days) => setState(() => _weekdays = days),
+              ),
+            ],
             const SizedBox(height: 24),
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -261,7 +452,9 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
                 _reminder == null
                     ? 'Toque para receber um aviso nos dias escolhidos.'
                     : remindersOn
-                    ? 'Aviso às ${_reminder!.format(context)} nos dias escolhidos'
+                    ? _goalType == GoalType.weekly
+                          ? 'Aviso às ${_reminder!.format(context)} todos os dias'
+                          : 'Aviso às ${_reminder!.format(context)} nos dias escolhidos'
                     : 'Às ${_reminder!.format(context)} · lembretes desligados '
                           'nas Configurações',
               ),
