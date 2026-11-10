@@ -13,13 +13,29 @@ export class SubscriptionsService {
   constructor(
     @InjectRepository(Subscription) private subRepo: Repository<Subscription>,
     @InjectRepository(User) private userRepo: Repository<User>,
-  ) {
-    // Inicializa o cliente Google (credenciais via env ou arquivo)
-    const auth = new google.auth.GoogleAuth({
-      keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_PATH, // ou credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
+  ) {}
+
+  private getAndroidPublisher() {
+    if (this.androidPublisher) return this.androidPublisher;
+
+    const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+    const keyFile = process.env.GOOGLE_SERVICE_ACCOUNT_PATH;
+    if (!json && !keyFile) {
+      throw new BadRequestException('Credenciais da Google Play não configuradas');
+    }
+
+    const authOptions: any = {
       scopes: ['https://www.googleapis.com/auth/androidpublisher'],
-    });
+    };
+    if (json) {
+      authOptions.credentials = JSON.parse(json);
+    } else {
+      authOptions.keyFile = keyFile;
+    }
+
+    const auth = new google.auth.GoogleAuth(authOptions);
     this.androidPublisher = google.androidpublisher({ version: 'v3', auth });
+    return this.androidPublisher;
   }
 
   async verifyGoogle(userId: string, dto: VerifySubscriptionDto) {
@@ -27,7 +43,8 @@ export class SubscriptionsService {
     if (!packageName) throw new BadRequestException('GOOGLE_PACKAGE_NAME não configurado');
 
     try {
-      const res = await this.androidPublisher.purchases.subscriptionsv2.get({
+      const androidPublisher = this.getAndroidPublisher();
+      const res = await androidPublisher.purchases.subscriptionsv2.get({
         packageName,
         token: dto.purchaseToken,
       });
@@ -71,6 +88,7 @@ export class SubscriptionsService {
         status: sub.status,
       };
     } catch (error) {
+      if (error instanceof BadRequestException) throw error;
       console.error('Google Play verification error:', error.message);
       throw new BadRequestException('Falha ao verificar assinatura com o Google Play');
     }

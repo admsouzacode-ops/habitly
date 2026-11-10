@@ -50,12 +50,13 @@ export class HabitsService {
     const habit = await this.habitRepo.findOne({ where: { id: dto.habit_id, user_id: userId } });
     if (!habit) throw new NotFoundException('Hábito não encontrado');
 
-    let log = await this.logRepo.findOne({ where: { habit_id: dto.habit_id, date: dto.date } });
+    const logDate = new Date(dto.date);
+    let log = await this.logRepo.findOne({ where: { habit_id: dto.habit_id, date: logDate } });
     if (log) {
       log.completed = dto.completed ?? true;
       log.note = dto.note;
     } else {
-      log = this.logRepo.create({ ...dto, user_id: userId });
+      log = this.logRepo.create({ ...dto, date: logDate, user_id: userId });
     }
     return this.logRepo.save(log);
   }
