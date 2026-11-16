@@ -5,7 +5,7 @@ import 'package:habitly/providers/providers.dart';
 import 'package:habitly/screens/achievements_screen.dart';
 import 'package:habitly/screens/paywall_screen.dart';
 
-const appVersionLabel = 'Versão 1.0.0 (8)';
+const appVersionLabel = 'Versão 1.0.0 (9)';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -64,6 +64,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(reminderServiceProvider).requestExactPermission();
     await _refreshExact();
     await _resync();
+  }
+
+  Future<void> _openAdPrivacy() async {
+    final message = await ref
+        .read(adsConsentProvider.notifier)
+        .showPrivacyOptions();
+    if (!mounted) return;
+    if (message != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   @override
@@ -148,6 +160,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => openPaywall(context),
+          ),
+          const Divider(),
+          const _SectionHeader('Privacidade'),
+          ListTile(
+            key: const ValueKey('settings-ad-privacy'),
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Privacidade dos anúncios'),
+            subtitle: const Text(
+              'Revise ou altere o consentimento usado para personalizar anúncios.',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _openAdPrivacy,
           ),
           const Divider(),
           ListTile(

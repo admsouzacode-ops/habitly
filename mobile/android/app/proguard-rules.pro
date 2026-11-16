@@ -26,6 +26,10 @@
 -keep class com.google.android.gms.common.** { *; }
 -dontwarn com.google.android.gms.**
 
+# Google UMP (User Messaging Platform / consent form)
+-keep class com.google.android.ump.** { *; }
+-dontwarn com.google.android.ump.**
+
 # flutter_local_notifications
 -keep class com.dexterous.** { *; }
 -dontwarn com.dexterous.**

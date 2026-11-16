@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:habitly/billing/billing_gateway.dart';
 import 'package:habitly/billing/premium_controller.dart';
@@ -5,11 +6,29 @@ import 'package:habitly/data/app_database.dart';
 import 'package:habitly/data/habit_repository.dart';
 import 'package:habitly/logic/achievements.dart';
 import 'package:habitly/logic/reminder_schedule.dart';
+import 'package:habitly/services/ads_consent.dart';
 import 'package:habitly/services/reminder_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const freeHabitLimit = 5;
+
+/// Banner oficial de teste do Google. Usado em debug e profile.
 const testBannerAdUnitId = 'ca-app-pub-3940256099942544/6300978111';
+
+/// Unidade de banner do AdMob do Habitly. Só entra em builds de release.
+const releaseBannerAdUnitId = 'ca-app-pub-4353657138842648/3412628718';
+
+/// ID da unidade de banner: teste fora de release, real em produção.
+String bannerAdUnitId({bool? release}) =>
+    (release ?? kReleaseMode) ? releaseBannerAdUnitId : testBannerAdUnitId;
+
+/// Fluxo UMP + inicialização do SDK. Inicie com [AdsConsent.gatherAndInitialize]
+/// em [main]; nos testes o estado permanece inerte (sem chamar o plugin).
+final adsConsentProvider = StateNotifierProvider<AdsConsent, AdsConsentState>((
+  ref,
+) {
+  return AdsConsent();
+});
 
 /// Desliga anúncios em testes de widget / ambientes sem Mobile Ads.
 final adsEnabledProvider = Provider<bool>((ref) => true);

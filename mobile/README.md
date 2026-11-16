@@ -3,6 +3,19 @@
 App offline-first de hábitos (Drift/SQLite + Riverpod, Material 3, pt-BR).
 Android `br.com.souzacode.habitly`.
 
+## Novidades 1.0.0+9
+- **AdMob de produção**: `APPLICATION_ID` real
+  (`ca-app-pub-4353657138842648~8236920841`) no `AndroidManifest`. O banner
+  usa a unidade real (`.../3412628718`) só em release (`kReleaseMode`); em
+  debug e profile continua o ID de teste do Google. Premium segue sem anúncios.
+- **Consentimento UMP** (`google_mobile_ads` ConsentInformation /
+  ConsentForm.loadAndShowConsentFormIfRequired) roda antes de inicializar ou
+  carregar anúncios, sem travar nem quebrar o app offline. Em Configurações
+  há o item **Privacidade dos anúncios**, que abre o formulário de opções
+  quando a UMP exige.
+- **app-ads.txt**: `store/app-ads.txt` (mesmo publisher `pub-4353657138842648`
+  para o root de `souzacode.com.br`).
+
 ## Novidades 1.0.0+8
 - **Premium real (Google Play Billing, `in_app_purchase`)**: assinatura
   `habitly_premium` com planos base `mensal` e `anual` (oferta de teste
@@ -42,7 +55,7 @@ Android `br.com.souzacode.habitly`.
   Nativo: `android/app/src/main/kotlin/.../HabitlyWidgetProvider.kt`,
   `res/layout/habitly_widget.xml`, `res/xml/habitly_widget_info.xml`.
 - Notas do dia (v3), lembretes (v2), limite de 5 hábitos no plano grátis com
-  anúncios de teste do AdMob.
+  anúncios do AdMob (ID de teste em debug; unidade real em release).
 
 ## Desenvolvimento
 ```bash

@@ -116,6 +116,21 @@ void main() {
     await disposeApp(tester);
   });
 
+  testWidgets('configurações mostram Privacidade dos anúncios', (tester) async {
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Configurações'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Lembretes de hábitos'), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.byKey(const ValueKey('settings-ad-privacy')),
+      find.byType(ListView).last,
+      const Offset(0, -300),
+    );
+    expect(find.text('Privacidade dos anúncios'), findsOneWidget);
+    await disposeApp(tester);
+  });
+
   testWidgets('mostra hábito existente e marca como concluído', (tester) async {
     final db = AppDatabase.memory();
     await HabitRepository(db).addHabit(
