@@ -4,7 +4,10 @@ import 'package:habitly/screens/home_shell.dart';
 import 'package:habitly/theme/habitly_theme.dart';
 
 class HabitlyApp extends StatelessWidget {
-  const HabitlyApp({super.key});
+  const HabitlyApp({super.key, this.theme});
+
+  /// Só para testes/capturas (ex.: fonte de emoji). Padrão: tema Habitly.
+  final ThemeData? theme;
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +21,7 @@ class HabitlyApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: buildHabitlyTheme(),
+      theme: theme ?? buildHabitlyTheme(),
       home: const HomeShell(),
     );
   }

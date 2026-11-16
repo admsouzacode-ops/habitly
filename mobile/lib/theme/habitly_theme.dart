@@ -34,13 +34,20 @@ const habitIconOptions = <String>[
   '🧠',
 ];
 
-ThemeData buildHabitlyTheme() {
+/// [fontFamily]/[fontFamilyFallback] só são usados nas capturas da loja
+/// (testes); no aparelho ficam nulos e valem as fontes do sistema.
+ThemeData buildHabitlyTheme({
+  String? fontFamily,
+  List<String>? fontFamilyFallback,
+}) {
   final scheme = ColorScheme.fromSeed(
     seedColor: habitlySeed,
     brightness: Brightness.light,
   ).copyWith(primary: habitlyGreen);
   return ThemeData(
     useMaterial3: true,
+    fontFamily: fontFamily,
+    fontFamilyFallback: fontFamilyFallback,
     colorScheme: scheme,
     appBarTheme: AppBarTheme(
       centerTitle: false,
@@ -81,7 +88,12 @@ ThemeData buildHabitlyTheme() {
       style: FilledButton.styleFrom(
         minimumSize: const Size(0, 52),
         shape: const StadiumBorder(),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        textStyle: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFamilyFallback,
+        ),
       ),
     ),
     chipTheme: ChipThemeData(

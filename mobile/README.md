@@ -3,6 +3,25 @@
 App offline-first de hábitos (Drift/SQLite + Riverpod, Material 3, pt-BR).
 Android `br.com.souzacode.habitly`.
 
+## Novidades 1.0.0+8
+- **Premium real (Google Play Billing, `in_app_purchase`)**: assinatura
+  `habitly_premium` com planos base `mensal` e `anual` (oferta de teste
+  grátis é usada quando o usuário é elegível). Preços sempre vêm do
+  `ProductDetails`. Código em `lib/billing/`: `premium_plans.dart` (escolhe
+  plano/oferta), `billing_gateway.dart` (plugin + gancho `verifyPurchase`
+  TODO para `POST /subscriptions/verify/google`) e `premium_controller.dart`
+  (purchaseStream, `completePurchase`/acknowledge, restaurar e revalidação na
+  abertura via `queryPastPurchases`; offline mantém o último estado salvo em
+  `premium_purchased`). Paywall em `lib/screens/paywall_screen.dart`. O toggle
+  de Premium simulado só existe em builds de debug.
+- **Conquistas**: cards com altura automática (linhas de 2 com
+  `IntrinsicHeight`), descrição inteira e título que diminui em vez de quebrar
+  palavra (`NoBreakTitle`). Testes em 360/400dp com texto x1.3.
+- **Assets da loja**: `STORE_SHOTS=<dir>/raw flutter test test/store_screenshots_test.dart`
+  renderiza as telas reais com dados de demonstração, e `python3 tool/gen_store_assets.py <dir>`
+  gera o ícone 512, as alternativas, o gráfico de recursos e as capturas com
+  legenda (cópia em `../store/`).
+
 ## Funções (1.0.0+7)
 - **Metas flexíveis** (schema Drift v4): por dias da semana, *X vezes por
   semana* (qualquer dia) ou *quantidade por dia* com meta, unidade e
@@ -23,7 +42,7 @@ Android `br.com.souzacode.habitly`.
   Nativo: `android/app/src/main/kotlin/.../HabitlyWidgetProvider.kt`,
   `res/layout/habitly_widget.xml`, `res/xml/habitly_widget_info.xml`.
 - Notas do dia (v3), lembretes (v2), limite de 5 hábitos no plano grátis com
-  anúncios de teste do AdMob, Premium simulado.
+  anúncios de teste do AdMob.
 
 ## Desenvolvimento
 ```bash
