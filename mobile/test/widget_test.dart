@@ -11,6 +11,8 @@ import 'package:habitly/providers/providers.dart';
 import 'package:habitly/theme/habitly_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'support/fake_billing.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -32,6 +34,7 @@ void main() {
           adsEnabledProvider.overrideWithValue(false),
           reminderSyncEnabledProvider.overrideWithValue(false),
           homeWidgetSyncEnabledProvider.overrideWithValue(false),
+          billingGatewayProvider.overrideWithValue(FakeBillingGateway()),
         ],
         child: const HabitlyApp(),
       ),
@@ -379,6 +382,41 @@ void main() {
     expect(find.text('Sequência atual'), findsOneWidget);
     expect(find.text('Recorde'), findsOneWidget);
     expect(find.text('Todos os dias'), findsOneWidget);
+    await disposeApp(tester);
+  });
+
+  testWidgets('6º hábito no grátis abre o aviso e o paywall com preços', (
+    tester,
+  ) async {
+    final db = AppDatabase.memory();
+    final repo = HabitRepository(db);
+    for (var i = 0; i < freeHabitLimit; i++) {
+      await repo.addHabit(
+        name: 'Hábito $i',
+        icon: '⭐',
+        colorValue: habitColorPalette.first.toARGB32(),
+        weekdays: {1, 2, 3, 4, 5, 6, 7},
+      );
+    }
+    await pumpApp(tester, database: db);
+    // O SnackBar da conquista cobre o FAB; aciona o botão direto.
+    tester
+        .widget<FloatingActionButton>(find.byType(FloatingActionButton))
+        .onPressed!();
+    for (var i = 0; i < 20; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.text('Recurso Premium').evaluate().isNotEmpty) break;
+    }
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Recurso Premium'), findsOneWidget);
+    await tester.tap(find.text('Ver Premium'));
+    await settle(tester, find.text('Hábitos ilimitados'));
+    expect(find.text('Habitly Premium'), findsOneWidget);
+    expect(find.text(r'R$ 9,90/mês'), findsOneWidget);
+    expect(find.text(r'7 dias grátis, depois R$ 59,90/ano'), findsOneWidget);
     await disposeApp(tester);
   });
 }

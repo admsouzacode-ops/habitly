@@ -42,9 +42,8 @@ void main() {
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
           habitSnapshotProvider.overrideWith(
-            (ref) => Stream.value(
-              const HabitSnapshot(habits: [], completions: []),
-            ),
+            (ref) =>
+                Stream.value(const HabitSnapshot(habits: [], completions: [])),
           ),
         ],
         child: MaterialApp(

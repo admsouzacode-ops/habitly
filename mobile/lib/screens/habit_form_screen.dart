@@ -281,10 +281,7 @@ class _HabitFormScreenState extends ConsumerState<HabitFormScreen> {
               key: const ValueKey('goal-type'),
               showSelectedIcon: false,
               segments: const [
-                ButtonSegment(
-                  value: GoalType.daily,
-                  label: Text('Dias'),
-                ),
+                ButtonSegment(value: GoalType.daily, label: Text('Dias')),
                 ButtonSegment(
                   value: GoalType.weekly,
                   label: Text('Por semana'),

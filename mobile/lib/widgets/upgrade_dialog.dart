@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:habitly/screens/paywall_screen.dart';
 
 Future<void> showUpgradeDialog(BuildContext context) {
   return showDialog<void>(
     context: context,
-    builder: (context) {
+    builder: (dialogContext) {
       return AlertDialog(
         title: const Text('Recurso Premium'),
         content: const Text(
@@ -13,19 +14,13 @@ Future<void> showUpgradeDialog(BuildContext context) {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Agora não'),
           ),
           FilledButton(
             onPressed: () {
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'A assinatura ainda não está disponível nesta versão.',
-                  ),
-                ),
-              );
+              Navigator.of(dialogContext).pop();
+              openPaywall(context);
             },
             child: const Text('Ver Premium'),
           ),

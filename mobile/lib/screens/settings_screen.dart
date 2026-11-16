@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:habitly/providers/providers.dart';
 import 'package:habitly/screens/achievements_screen.dart';
+import 'package:habitly/screens/paywall_screen.dart';
 
-const appVersionLabel = 'Versão 1.0.0 (7)';
+const appVersionLabel = 'Versão 1.0.0 (8)';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -133,34 +135,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           ListTile(
+            key: const ValueKey('settings-plan'),
             leading: Icon(
               premium ? Icons.workspace_premium : Icons.star_border,
+              color: premium ? scheme.primary : null,
             ),
             title: const Text('Plano'),
             subtitle: Text(
-              premium ? 'Premium (teste)' : 'Gratuito · até 5 hábitos',
+              premium
+                  ? 'Premium · hábitos ilimitados, sem anúncios'
+                  : 'Gratuito · até 5 hábitos. Toque para ver o Premium.',
             ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => openPaywall(context),
           ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('Habitly'),
             subtitle: const Text(appVersionLabel),
-            onLongPress: () {
-              setState(() => _showTestToggle = true);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Opções de teste liberadas.')),
-              );
-            },
+            onLongPress: !kDebugMode
+                ? null
+                : () {
+                    setState(() => _showTestToggle = true);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Opções de teste liberadas.'),
+                      ),
+                    );
+                  },
           ),
-          if (_showTestToggle)
+          // Toggle de simulação só existe em builds de debug.
+          if (kDebugMode && _showTestToggle)
             SwitchListTile(
               secondary: const Icon(Icons.science_outlined),
               title: const Text('Simular assinatura Premium'),
-              subtitle: const Text('Opção oculta para testes. Não cobra nada.'),
-              value: premium,
+              subtitle: const Text('Só em debug. Não cobra nada.'),
+              value: ref.watch(premiumControllerProvider).mock,
               onChanged: (value) =>
-                  ref.read(premiumProvider.notifier).setPremium(value),
+                  ref.read(premiumControllerProvider.notifier).setMock(value),
             ),
         ],
       ),

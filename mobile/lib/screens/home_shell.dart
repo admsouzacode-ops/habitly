@@ -30,6 +30,10 @@ class _HomeShellState extends ConsumerState<HomeShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Assinatura: escuta compras e revalida o Premium no Google Play.
+    Future.microtask(() {
+      if (mounted) ref.read(premiumControllerProvider.notifier).start();
+    });
   }
 
   @override
