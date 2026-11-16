@@ -66,20 +66,15 @@ class AchievementsScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.92,
-                children: [
+              _AchievementRows(
+                builder: (tileWidth) => [
                   for (final a in achievements)
                     _AchievementTile(
                       achievement: a,
                       unlocked: unlocked(a),
                       value: progress[a.id] ?? 0,
                       unlockedAt: ledger.unlockedAt[a.id],
+                      contentWidth: tileWidth - _AchievementTile.padding * 2,
                     ),
                 ],
               ),
@@ -97,12 +92,16 @@ class _AchievementTile extends StatelessWidget {
     required this.unlocked,
     required this.value,
     this.unlockedAt,
+    required this.contentWidth,
   });
+
+  static const padding = 14.0;
 
   final Achievement achievement;
   final bool unlocked;
   final int value;
   final DateTime? unlockedAt;
+  final double contentWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -112,48 +111,50 @@ class _AchievementTile extends StatelessWidget {
     return Card(
       key: ValueKey('achievement-${achievement.id}'),
       color: unlocked ? scheme.secondaryContainer : scheme.surfaceContainerLow,
+      margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(padding),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: unlocked
-                  ? scheme.primary.withValues(alpha: 0.18)
-                  : scheme.surfaceContainerHighest,
-              child: Opacity(
-                opacity: unlocked ? 1 : 0.35,
-                child: Text(
-                  achievement.emoji,
-                  style: const TextStyle(fontSize: 28),
+            Center(
+              child: CircleAvatar(
+                radius: 28,
+                backgroundColor: unlocked
+                    ? scheme.primary.withValues(alpha: 0.18)
+                    : scheme.surfaceContainerHighest,
+                child: Opacity(
+                  opacity: unlocked ? 1 : 0.35,
+                  child: Text(
+                    achievement.emoji,
+                    style: const TextStyle(fontSize: 28),
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 8),
-            Text(
+            NoBreakTitle(
               achievement.title,
-              textAlign: TextAlign.center,
+              maxWidth: contentWidth,
               style: textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: unlocked ? null : scheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 4),
-            Expanded(
-              child: Text(
-                achievement.description,
-                textAlign: TextAlign.center,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.bodySmall,
-              ),
+            Text(
+              achievement.description,
+              textAlign: TextAlign.center,
+              style: textTheme.bodySmall,
             ),
+            const SizedBox(height: 8),
+            const Spacer(),
             if (unlocked)
               Text(
                 unlockedAt != null
                     ? 'Desde ${shortDateFormat.format(unlockedAt!)}'
                     : 'Desbloqueada',
+                textAlign: TextAlign.center,
                 style: textTheme.labelSmall?.copyWith(color: scheme.primary),
               )
             else ...[
@@ -165,11 +166,98 @@ class _AchievementTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              Text('$shown/${achievement.goal}', style: textTheme.labelSmall),
+              Text(
+                '$shown/${achievement.goal}',
+                textAlign: TextAlign.center,
+                style: textTheme.labelSmall,
+              ),
             ],
           ],
         ),
       ),
     );
+  }
+}
+
+/// Duas colunas; cada linha tem a altura do card mais alto (sem cortar texto).
+class _AchievementRows extends StatelessWidget {
+  const _AchievementRows({required this.builder});
+
+  /// Recebe a largura de cada card.
+  final List<Widget> Function(double tileWidth) builder;
+
+  static const spacing = 12.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tileWidth = (constraints.maxWidth - spacing) / 2;
+        final children = builder(tileWidth);
+        final rows = <Widget>[];
+        for (var i = 0; i < children.length; i += 2) {
+          if (i > 0) rows.add(const SizedBox(height: spacing));
+          rows.add(
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: children[i]),
+                  const SizedBox(width: spacing),
+                  Expanded(
+                    child: i + 1 < children.length
+                        ? children[i + 1]
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return Column(children: rows);
+      },
+    );
+  }
+}
+
+/// Título centralizado que quebra só entre palavras: se a palavra mais longa
+/// não cabe em [maxWidth], a fonte diminui até caber (ex.: "Autoconhecimento").
+class NoBreakTitle extends StatelessWidget {
+  const NoBreakTitle(
+    this.text, {
+    super.key,
+    required this.maxWidth,
+    this.style,
+    this.minScale = 0.6,
+  });
+
+  final String text;
+  final double maxWidth;
+  final TextStyle? style;
+  final double minScale;
+
+  @override
+  Widget build(BuildContext context) {
+    final base = DefaultTextStyle.of(context).style.merge(style);
+    final scaler = MediaQuery.textScalerOf(context);
+    var effective = base;
+    if (maxWidth.isFinite && maxWidth > 0) {
+      var widest = 0.0;
+      for (final word in text.split(RegExp(r'\s+'))) {
+        final tp = TextPainter(
+          text: TextSpan(text: word, style: base),
+          textDirection: Directionality.of(context),
+          textScaler: scaler,
+          maxLines: 1,
+        )..layout();
+        if (tp.width > widest) widest = tp.width;
+        tp.dispose();
+      }
+      if (widest > maxWidth) {
+        final scale = (maxWidth / widest * 0.97).clamp(minScale, 1.0);
+        effective = base.copyWith(fontSize: (base.fontSize ?? 14) * scale);
+      }
+    }
+    return Text(text, textAlign: TextAlign.center, style: effective);
   }
 }
